@@ -21,6 +21,14 @@ app = Flask(__name__)
 model = None
 prev_image_array = None
 
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
+
+config = ConfigProto()
+config.gpu_options.per_process_gpu_memory_fraction = 0.2
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
+
 
 class SimplePIController:
     def __init__(self, Kp, Ki):
@@ -61,6 +69,7 @@ def telemetry(sid, data):
         imgString = data["image"]
         image = Image.open(BytesIO(base64.b64decode(imgString)))
         image_array = np.asarray(image)
+        image_array = image_array / 255
         steering_angle = float(model.predict(image_array[None, :, :, :], batch_size=1))
 
         throttle = controller.update(float(speed))
