@@ -22,50 +22,66 @@ for file in os.listdir(data_path):
         data_files.append(file)
 print(f'There are files {data_files} in data_path')
 
-# only front camera
+# use all three cameras      
 for file in data_files:
     with open(os.path.join(data_path, file)) as csvf:
+        next(csvf)
         reader = csv.reader(csvf)
         for line in reader:
-                source_path = line[0]
+            for i in range(3):
+                source_path = line[i]
+#                     source_path = line[0]
                 file_path = source_path.split('/')[-1]
-                measurement = float(line[3])
+        #         print(file_path)
+
+        #         print(measurement)
+        #         measurements.append(measurement)
+                if i == 0:
+                    measurement = float(line[3])
+                elif i == 1:
+                    measurement = float(line[3]) + 0.1
+                elif i == 2:
+                    measurement = float(line[3]) - 0.1
                 nano_df = pd.DataFrame([[file_path, measurement]], columns=['image', 'measure'])
                 df = df.append(nano_df, ignore_index=True)
+                
 # show dataframe info if needed
 # df.info()
+
 # add some normalization to the data and cut some really strait steering angles examples
+# to make data normaly distributed
 norm_df= []
 norm_df = df.drop(df[(df['measure'] < 0.02) & (df['measure'] > -0.01)].index)
+norm_df = norm_df.drop(norm_df[(norm_df['measure'] < -0.099) & (norm_df['measure'] > -0.12)].index)
+norm_df = norm_df.drop(norm_df[(norm_df['measure'] < 0.12) & (norm_df['measure'] > 0.095)].index)
 
 # define net
 model_name = "model" 
+# Nvidia net without batch normalization
 model = Sequential()
 input_shape = (80, 160, 3)
-# crop up and down part of the image because they don't have usefull information
 model.add(Cropping2D(cropping=((25,10), (0,0)), input_shape=input_shape))
-# normalize input image to range from 0 to 1 
-model.add(Lambda(lambda x: tf.cast(x, tf.float32) / 255.0))
-# lets net to decode image in to self color space
-model.add(layers.Conv2D(3, (1, 1), 1, padding="valid"))
+model.add(Lambda(lambda x: tf.cast(x, tf.float32) / 255.0 - 0.5))
 # first convolution layer
 model.add(layers.Conv2D(24, (5, 5), 1,
                         padding="valid"))  # filter num, kernel size, stride, padding
-model.add(layers.BatchNormalization(axis=-1))
+model.add(layers.BatchNormalization())
 model.add(layers.Activation("relu"))
-# second convolution layer
-model.add(layers.Conv2D(36, (5, 5), 1, padding="valid"))
-model.add(layers.BatchNormalization(axis=-1))
+# second convolution layer, kernel_regularizer=regularizers.l2(0.1)
+model.add(layers.Conv2D(36, (5, 5), 2,
+                        padding="valid"))
+model.add(layers.BatchNormalization())
 model.add(layers.Activation("relu"))
 # third conv layer
-model.add(layers.Conv2D(48, (3, 3), 1, padding="valid"))
-model.add(layers.BatchNormalization(axis=-1))
+model.add(layers.Conv2D(48, (3, 3), 2,
+                        padding="valid"))
+model.add(layers.BatchNormalization())
 model.add(layers.Activation("relu"))
 # forth conv layer
-model.add(layers.Conv2D(64, (3, 3), 1, padding="valid"))
-model.add(layers.BatchNormalization(axis=-1))
+model.add(layers.Conv2D(64, (3, 3), 1,
+                        padding="valid"))
+model.add(layers.BatchNormalization())
 model.add(layers.Activation("relu"))
-model.add(layers.MaxPooling2D(pool_size=(2, 2), padding="valid"))
 model.add(layers.Flatten())
 # first fully connected layer
 model.add(layers.Dense(120))
@@ -85,12 +101,14 @@ model.add(layers.Dropout(0.5))
 model.add(layers.Dense(1))
 
 # define generator for learing
-BS = 150
+BS = 100
 target_size = (80, 160)
+dataframe = norm_df
+directory = data_path
 # define data to train and validation
 datagen=ImageDataGenerator(validation_split=0.2)
-train_generator=datagen.flow_from_dataframe(dataframe=norm_df,
-                                            directory=data_path,
+train_generator=datagen.flow_from_dataframe(dataframe=dataframe,
+                                            directory=directory,
                                             x_col="image",
                                             y_col="measure",
                                             subset="training",
@@ -100,11 +118,11 @@ train_generator=datagen.flow_from_dataframe(dataframe=norm_df,
                                             class_mode="raw",
                                             target_size=target_size)
 
-valid_generator=datagen.flow_from_dataframe(dataframe=norm_df,
-                                            directory=data_path,
+valid_generator=datagen.flow_from_dataframe(dataframe=dataframe,
+                                            directory=directory,
                                             x_col="image",
                                             y_col="measure",
-                                            subset="training",
+                                            subset="validation",
                                             batch_size=BS,
                                             seed=42,
                                             shuffle=True,
