@@ -90,7 +90,8 @@ At the end of the process, the vehicle is able to drive autonomously around the 
 
 #### 2. Final Model Architecture
 
-The final model architecture (model.py lines 58-101) consisted of a convolution neural network with the following layers and layer sizes ...
+The final model architecture (model.py lines 58-101) consisted of a convolution neural network with the following layers and layer sizes :
+
 | layer | output |
 |-------|--------|
 | input layer| 80x160x3 |
@@ -103,7 +104,7 @@ The final model architecture (model.py lines 58-101) consisted of a convolution 
 | fully connected relu activation | 120 |
 | fully connected relu activation | 84 |
 | fully connected softmax activation | 10 |
-| fully connected | 1 |
+| output layer | 1 |
 
 Here is a visualization of the architecture (note: visualizing the architecture is optional according to the project rubric)
 
